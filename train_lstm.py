@@ -169,7 +169,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=str, default='cuda:0')
     parser.add_argument('--batch_size', type=int, default=64, help='total batchsz for train and test')
-    parser.add_argument('--epochs', type=int, default=100, help='epoch number')
+    parser.add_argument('--epochs', type=int, default=10, help='epoch number')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--lookback', type=int, default=100, help='look back of network')
     parser.add_argument('--positional_encoding', type = str, default='all', choices=['none', 'sun', 'all'], help='defines which data to use for forecasting')
