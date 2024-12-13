@@ -36,6 +36,9 @@ def main():
     # Initialze new network
     if  positional_encoding == 'all':
         n_input = 4
+    # set encodoging to include power
+    elif positional_encoding == 'extended':
+        n_input = 5
     elif positional_encoding == 'sun':
         n_input = 3
     elif positional_encoding == 'none':
@@ -169,11 +172,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=str, default='cuda:0')
     parser.add_argument('--batch_size', type=int, default=64, help='total batchsz for train and test')
-    parser.add_argument('--epochs', type=int, default=10, help='epoch number')
+    parser.add_argument('--epochs', type=int, default=15, help='epoch number')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
-    parser.add_argument('--lookback', type=int, default=100, help='look back of network')
-    parser.add_argument('--positional_encoding', type = str, default='all', choices=['none', 'sun', 'all'], help='defines which data to use for forecasting')
-    parser.add_argument('--data_path', type=str, default='./raw_data/final_splits')
+    parser.add_argument('--lookback', type=int, default=2, help='look back of network') #smaller lookback window for smaller data (default 100)
+    parser.add_argument('--positional_encoding', type = str, default='all', choices=['none', 'sun', 'all','extended'], help='defines which data to use for forecasting')
+    parser.add_argument('--data_path', type=str, default='./raw_data/extended_input')
     parser.add_argument('--experiment_path', type=str, default='./saved_runs/test')
     args = parser.parse_args()
 
