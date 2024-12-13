@@ -171,7 +171,7 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=str, default='cuda:0')
-    parser.add_argument('--batch_size', type=int, default=64, help='total batchsz for train and test')
+    parser.add_argument('--batch_size', type=int, default=4, help='total batchsz for train and test') #smaller to fit dataset (default 64)
     parser.add_argument('--epochs', type=int, default=15, help='epoch number')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--lookback', type=int, default=2, help='look back of network') #smaller lookback window for smaller data (default 100)
