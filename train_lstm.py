@@ -36,8 +36,8 @@ def main():
     # Initialze new network
     if  positional_encoding == 'all':
         n_input = 4
-    # set encodoging to include power
-    elif positional_encoding == 'extended':
+    # set encoding to include pv
+    elif positional_encoding == 'pv_const':
         n_input = 5
     elif positional_encoding == 'sun':
         n_input = 3
@@ -166,7 +166,7 @@ def main():
     
     print('Trainig took: {:.2f}s for {} epochs'.format(training_time, epoch))
     print('Finish training, Best-Test-Loss: %0.5f, Best-Train-Loss:%0.5f '  % (best_val_loss, best_train_loss))
-
+    print("Batch size and other metrics df metric\n", df_metric)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -174,8 +174,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=4, help='total batchsz for train and test') #smaller to fit dataset (default 64)
     parser.add_argument('--epochs', type=int, default=15, help='epoch number')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
-    parser.add_argument('--lookback', type=int, default=2, help='look back of network') #smaller lookback window for smaller data (default 100)
-    parser.add_argument('--positional_encoding', type = str, default='all', choices=['none', 'sun', 'all','extended'], help='defines which data to use for forecasting')
+    parser.add_argument('--lookback', type=int, default=3, help='look back of network') #smaller lookback window for smaller data (default 100)
+    parser.add_argument('--positional_encoding', type = str, default='all', choices=['none', 'sun', 'all','pv_const'], help='defines which data to use for forecasting')
     parser.add_argument('--data_path', type=str, default='./raw_data/extended_input')
     parser.add_argument('--experiment_path', type=str, default='./saved_runs/test')
     args = parser.parse_args()

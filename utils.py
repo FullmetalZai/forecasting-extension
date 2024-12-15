@@ -29,7 +29,7 @@ def generate_sequences(df: pd.Series, tw: int, pw: int):
     #print(sequence.shape)
     # Get values right after the current sequence
     target = df[i+tw:i+tw+pw].values[:,0] # [power]
-    
+    print(sequence)
     data[i] = {'sequence': sequence, 'target': target}
   return data
 
@@ -47,6 +47,8 @@ class SequenceDataset(Dataset):
        sample_sequence = sample['sequence']
     elif self.positional_encoding == 'sun':
        sample_sequence = sample['sequence'][:, 0:3] # With sun positional encoding and active power
+    elif self.positional_encoding == 'pv_const':
+        sample_sequence = sample['sequence'][:, 0:6] # With constant pv load
     else:
        sample_sequence = sample['sequence'][:, 0:1] # Without positional encoding only active power
        
