@@ -29,7 +29,7 @@ def generate_sequences(df: pd.Series, tw: int, pw: int):
     #print(sequence.shape)
     # Get values right after the current sequence
     target = df[i+tw:i+tw+pw].values[:,0] # [power]
-    print(sequence)
+    
     data[i] = {'sequence': sequence, 'target': target}
   return data
 
@@ -42,16 +42,15 @@ class SequenceDataset(Dataset):
 
   def __getitem__(self, idx):
     sample = self.data[idx]
-
+    
     if self.positional_encoding == 'all':
-       sample_sequence = sample['sequence']
+      sample_sequence = sample['sequence']
     elif self.positional_encoding == 'sun':
-       sample_sequence = sample['sequence'][:, 0:3] # With sun positional encoding and active power
+      sample_sequence = sample['sequence'][:, 0:3] # With sun positional encoding and active power
     elif self.positional_encoding == 'pv_const':
-        sample_sequence = sample['sequence'][:, 0:6] # With constant pv load
+      sample_sequence = sample['sequence'][:, 0:6] # With constant pv load and other inputs
     else:
-       sample_sequence = sample['sequence'][:, 0:1] # Without positional encoding only active power
-       
+      sample_sequence = sample['sequence'][:, 0:1] # Without positional encoding only active power 
     #print(sample_sequence.shape)
     #print(sample['target'].shape)
 
@@ -130,6 +129,12 @@ def run_closed_loop(model, whole_sequence, lookback = 100, future_prediction=4, 
       input = torch.Tensor(input_numpy.T)
       #print(input.shape)
       input = input.view(-1,1,3)
+    elif use_positional_encoding == 'pv_const':
+      input_numpy = np.array([whole_sequence[0:lookback, 0], whole_sequence[1:lookback+1, 1], whole_sequence[1:lookback+1, 2],whole_sequence[1:lookback+1, 3],whole_sequence[1:lookback+1,4]])
+      #print(input_numpy.shape)
+      input = torch.Tensor(input_numpy.T)
+      #print(input.shape)
+      input = input.view(-1,1,5)
     else:
       input_numpy = np.array([whole_sequence[0:lookback, 0]])
       input = torch.Tensor(input_numpy.T)

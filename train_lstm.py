@@ -35,7 +35,7 @@ def main():
         
     # Initialze new network
     if  positional_encoding == 'all':
-        n_input = 4
+        n_input = 4  #default = 4
     # set encoding to include pv
     elif positional_encoding == 'pv_const':
         n_input = 5
@@ -83,14 +83,22 @@ def main():
         #scaling_dictionary[column] = {'min' : min_val}
         scaling_dictionary[column] = {'max' : max_val, 'min': min_val}
         #print(df_train_val[column])
-        df_train_scaled[column] = (df_train[column].values - min_val) / (max_val - min_val)
+        if max_val == min_val:
+            df_train_scaled[column] = 1.0
+        else:
+            df_train_scaled[column] = (df_train[column].values - min_val) / (max_val - min_val)
     df_train_scaled.index = df_train.index
-        
+    
+      
+    
     for i, (df_valid, df_valid_scaled) in enumerate(zip(df_valid_list, df_valid_scaled_list)):
             for column in target_columns:
                 max_val = scaling_dictionary[column]['max']
                 min_val = scaling_dictionary[column]['min']
-                df_valid_scaled[column] = (df_valid[column].values - min_val) / (max_val - min_val)
+                if max_val == min_val:
+                    df_valid_scaled[column] = 1.0
+                else:
+                    df_valid_scaled[column] = (df_valid[column].values - min_val) / (max_val - min_val)
             df_valid_scaled.index = df_valid.index
             df_valid_scaled_list[i] = df_valid_scaled
 
@@ -98,7 +106,10 @@ def main():
             for column in target_columns:
                 max_val = scaling_dictionary[column]['max']
                 min_val = scaling_dictionary[column]['min']
-                df_test_scaled[column] = (df_test[column].values - min_val) / (max_val - min_val)
+                if max_val == min_val:
+                    df_test_scaled[column] = 1.0
+                else:
+                    df_test_scaled[column] = (df_test[column].values - min_val) / (max_val - min_val)
             df_test_scaled.index = df_test.index
             df_test_scaled_list[i] = df_test_scaled
             
@@ -117,6 +128,7 @@ def main():
 
     sequences_train = generate_sequences(df_train_scaled, lookback, 1)
     print(len(sequences_train))
+    
     sequences_valid_list = []
     for i, df_valid_scaled in enumerate(df_valid_scaled_list):
             sequences_valid = generate_sequences(df_valid_scaled, lookback, 1)
@@ -171,13 +183,13 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=str, default='cuda:0')
-    parser.add_argument('--batch_size', type=int, default=4, help='total batchsz for train and test') #smaller to fit dataset (default 64)
+    parser.add_argument('--batch_size', type=int, default=64, help='total batchsz for train and test') #smaller to fit dataset (default 64)
     parser.add_argument('--epochs', type=int, default=15, help='epoch number')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
-    parser.add_argument('--lookback', type=int, default=3, help='look back of network') #smaller lookback window for smaller data (default 100)
-    parser.add_argument('--positional_encoding', type = str, default='all', choices=['none', 'sun', 'all','pv_const'], help='defines which data to use for forecasting')
-    parser.add_argument('--data_path', type=str, default='./raw_data/extended_input')
-    parser.add_argument('--experiment_path', type=str, default='./saved_runs/test')
+    parser.add_argument('--lookback', type=int, default=100, help='look back of network') #smaller lookback window for smaller data (default 100)
+    parser.add_argument('--positional_encoding', type = str, default='pv_const', choices=['none', 'sun', 'all','pv_const'], help='defines which data to use for forecasting')
+    parser.add_argument('--data_path', type=str, default='./raw_data/pv_excel')
+    parser.add_argument('--experiment_path', type=str, default='./saved_runs/test_extended_input')
     args = parser.parse_args()
 
     print("device is --------------", args.device)
