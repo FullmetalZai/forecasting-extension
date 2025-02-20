@@ -130,7 +130,7 @@ def run_closed_loop(model, whole_sequence, lookback = 100, future_prediction=4, 
       #print(input.shape)
       input = input.view(-1,1,3)
     elif use_positional_encoding == 'pv_const':
-      input_numpy = np.array([whole_sequence[0:lookback, 0], whole_sequence[1:lookback+1, 1], whole_sequence[1:lookback+1, 2],whole_sequence[1:lookback+1, 3],whole_sequence[1:lookback+1,4]])
+      input_numpy = np.array([whole_sequence[0:lookback, 0], whole_sequence[1:lookback+1, 1], whole_sequence[1:lookback+1, 2],whole_sequence[1:lookback+1, 3],whole_sequence[1:lookback+1,5]])
       #print(input_numpy.shape)
       input = torch.Tensor(input_numpy.T)
       #print(input.shape)
@@ -148,6 +148,8 @@ def run_closed_loop(model, whole_sequence, lookback = 100, future_prediction=4, 
               input_tmp = input[i,:,:].view(-1,1,4)
             elif use_positional_encoding == 'sun':
               input_tmp = input[i,:,:].view(-1,1,3)
+            elif use_positional_encoding == 'pv_const':
+              input_tmp = input[i,:,:].view(-1,1,5)
             else:
               input_tmp = input[i,:,:].view(-1,1,1)
 
@@ -159,7 +161,9 @@ def run_closed_loop(model, whole_sequence, lookback = 100, future_prediction=4, 
             elif use_positional_encoding == 'all_original':
               input = torch.Tensor([pred[0,0], whole_sequence[lookback + i+1, 1], whole_sequence[lookback + i+1, 2],  whole_sequence[lookback + i+1, 3]]).view(1,1,4) 
             elif use_positional_encoding == 'sun':
-              input = torch.Tensor([pred[0,0], whole_sequence[lookback + i+1, 1], whole_sequence[lookback + i+1, 2]]).view(1,1,3) 
+              input = torch.Tensor([pred[0,0], whole_sequence[lookback + i+1, 1], whole_sequence[lookback + i+1, 2]]).view(1,1,3)
+            elif use_positional_encoding == 'pv_const':
+              input = torch.Tensor([pred[0,0], whole_sequence[lookback + i+1, 1], whole_sequence[lookback + i+1, 2],  whole_sequence[lookback + i+1, 3], whole_sequence[lookback + i+1, 4]]).view(1,1,5)  
             else:
               input = torch.Tensor([pred[0,0]]).view(1,1,1) 
             pred, hx = model(input, hx)

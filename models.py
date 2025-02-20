@@ -2,7 +2,7 @@ import torch.nn as nn
 import numpy as np
 
 class simpleLSTM(nn.Module):
-    def __init__(self, n_input_features = 4, n_hidden = 50, num_layers = 4, n_outputs = 1, batch_first = False, bidirectional = False):
+    def __init__(self, n_input_features = 5, n_hidden = 50, num_layers = 4, n_outputs = 1, batch_first = False, bidirectional = False):
         super().__init__()
         self.batch_first = batch_first
         self.bidirectional = bidirectional
