@@ -84,7 +84,7 @@ def main():
         scaling_dictionary[column] = {'max' : max_val, 'min': min_val}
         #print(df_train_val[column])
         if max_val == min_val:
-            df_train_scaled[column] = 1.0
+            df_train_scaled[column] = 0.2
         else:
             df_train_scaled[column] = (df_train[column].values - min_val) / (max_val - min_val)
     df_train_scaled.index = df_train.index
@@ -96,7 +96,7 @@ def main():
                 max_val = scaling_dictionary[column]['max']
                 min_val = scaling_dictionary[column]['min']
                 if max_val == min_val:
-                    df_valid_scaled[column] = 1.0
+                    df_valid_scaled[column] = 0.2
                 else:
                     df_valid_scaled[column] = (df_valid[column].values - min_val) / (max_val - min_val)
             df_valid_scaled.index = df_valid.index
@@ -107,7 +107,7 @@ def main():
                 max_val = scaling_dictionary[column]['max']
                 min_val = scaling_dictionary[column]['min']
                 if max_val == min_val:
-                    df_test_scaled[column] = 1.0
+                    df_test_scaled[column] = 0.2
                 else:
                     df_test_scaled[column] = (df_test[column].values - min_val) / (max_val - min_val)
             df_test_scaled.index = df_test.index
@@ -187,9 +187,9 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=100, help='epoch number')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--lookback', type=int, default=100, help='look back of network') #smaller lookback window for smaller data (default 100)
-    parser.add_argument('--positional_encoding', type = str, default='all', choices=['none', 'sun', 'all','pv_const'], help='defines which data to use for forecasting')
-    parser.add_argument('--data_path', type=str, default='./raw_data/final_splits')
-    parser.add_argument('--experiment_path', type=str, default='./saved_runs/test')
+    parser.add_argument('--positional_encoding', type = str, default='pv_const', choices=['none', 'sun', 'all','pv_const'], help='defines which data to use for forecasting')
+    parser.add_argument('--data_path', type=str, default='./raw_data/pv0.2')
+    parser.add_argument('--experiment_path', type=str, default='./saved_runs/with_pv0.2')
     args = parser.parse_args()
 
     print("device is --------------", args.device)
