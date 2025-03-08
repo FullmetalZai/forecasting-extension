@@ -23,8 +23,9 @@ def generate_sequences(df: pd.Series, tw: int, pw: int):
     #sequence = df[i:i+tw].values[:,0:-1]  # [power, altitude, azimuth, irradiance]
     power_not_shifted = df[i:i+tw].values[:,0:1]
     #print(power_not_shifted.shape)
-    sequence_shift = df[i+1:i+tw+1].values[:,1:-1]
-    #print(sequence_shift.shape)
+    sequence_shift = df[i+1:i+tw+1].values[:,1:]
+    sequence_shift = np.delete(sequence_shift, -2, axis=1)
+    print(sequence_shift.shape)
     sequence = np.concatenate((power_not_shifted, sequence_shift), axis = 1)
     #print(sequence.shape)
     # Get values right after the current sequence
