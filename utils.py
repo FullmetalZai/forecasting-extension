@@ -24,8 +24,8 @@ def generate_sequences(df: pd.Series, tw: int, pw: int):
     power_not_shifted = df[i:i+tw].values[:,0:1]
     #print(power_not_shifted.shape)
     sequence_shift = df[i+1:i+tw+1].values[:,1:]
-    sequence_shift = np.delete(sequence_shift, -2, axis=1)
-    print(sequence_shift.shape)
+    sequence_shift = np.delete(sequence_shift, -2, axis=1) #deletion of irradiance forecast
+    #print(sequence_shift.shape)
     sequence = np.concatenate((power_not_shifted, sequence_shift), axis = 1)
     #print(sequence.shape)
     # Get values right after the current sequence
@@ -52,8 +52,15 @@ class SequenceDataset(Dataset):
       sample_sequence = sample['sequence'][:, 0:6] # With constant pv load and other inputs
     else:
       sample_sequence = sample['sequence'][:, 0:1] # Without positional encoding only active power 
+    #Debug options
     #print(sample_sequence.shape)
     #print(sample['target'].shape)
+    #print(f"Index: {idx}")
+    #print(f"Positional Encoding: {self.positional_encoding}")
+    #print(f"Sample Sequence Shape: {sample_sequence.shape}")
+    #print(f"Sample Sequence Data:\n{sample_sequence}\n")
+    #print(f"Target Shape: {sample['target'].shape}")
+    #print(f"Target Data:\n{sample['target']}\n")
 
     return torch.Tensor(sample_sequence), torch.Tensor(sample['target'])#.squeeze()
   
@@ -132,6 +139,7 @@ def run_closed_loop(model, whole_sequence, lookback = 100, future_prediction=4, 
       input = input.view(-1,1,3)
     elif use_positional_encoding == 'pv_const':
       input_numpy = np.array([whole_sequence[0:lookback, 0], whole_sequence[1:lookback+1, 1], whole_sequence[1:lookback+1, 2],whole_sequence[1:lookback+1, 3],whole_sequence[1:lookback+1,5]])
+      #print(whole_sequence[:10]) 
       #print(input_numpy.shape)
       input = torch.Tensor(input_numpy.T)
       #print(input.shape)
@@ -164,7 +172,7 @@ def run_closed_loop(model, whole_sequence, lookback = 100, future_prediction=4, 
             elif use_positional_encoding == 'sun':
               input = torch.Tensor([pred[0,0], whole_sequence[lookback + i+1, 1], whole_sequence[lookback + i+1, 2]]).view(1,1,3)
             elif use_positional_encoding == 'pv_const':
-              input = torch.Tensor([pred[0,0], whole_sequence[lookback + i+1, 1], whole_sequence[lookback + i+1, 2],  whole_sequence[lookback + i+1, 3], whole_sequence[lookback + i+1, 4]]).view(1,1,5)  
+              input = torch.Tensor([pred[0,0], whole_sequence[lookback + i+1, 1], whole_sequence[lookback + i+1, 2],  whole_sequence[lookback + i+1, 3], whole_sequence[lookback + i+1, 5]]).view(1,1,5) 
             else:
               input = torch.Tensor([pred[0,0]]).view(1,1,1) 
             pred, hx = model(input, hx)
