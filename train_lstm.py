@@ -26,6 +26,9 @@ def main():
     model_save_path =  os.path.join(experiment_path, 'best_valid_model.pt')
     scaling_factors_path = os.path.join(experiment_path, 'scalings.json')
     os.makedirs(experiment_path, exist_ok=True)
+
+    # Flag for combined datasets
+    combined = args.combined
   
     # Dataframe for storing important metrics over epochs
     start_time = get_time()
@@ -53,99 +56,144 @@ def main():
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1, eta_min=0)
+    if combined == 1:
+        list_of_combined_sizes = ["0.2", "0.6", "1.0"]
 
-    # Start dataset loading
-    df_train = pd.read_csv(os.path.join(data_path, 'train.csv'), index_col=0)
-    df_test_list = []
-    df_valid_list = []
+        df_02 = pd.read_csv("./saved_runs/with_pv0.2/train_data_scaled.csv", index_col=0)
+        df_06 = pd.read_csv("./saved_runs/with_pv0.6/train_data_scaled.csv", index_col=0)
+        df_10 = pd.read_csv("./saved_runs/with_pv1.0/train_data_scaled.csv", index_col=0)
+        df_train_scaled = pd.concat([df_02, df_06, df_10], axis=0)
+        df_train_scaled = df_train_scaled.sort_index()
+        df_train_scaled.to_csv(os.path.join(experiment_path, 'train_combined_data_scaled.csv'))
 
-    valid_csv_files = search_csv_files(data_path, 'val')
-    test_csv_files = search_csv_files(data_path, 'test')
+        sequences_train = generate_sequences(df_train_scaled, lookback, 1)
+        #print(len(sequences_train))
 
-    for valid_csv_path in valid_csv_files:
-        df_val = pd.read_csv(valid_csv_path, index_col=0)
-        df_valid_list.append(df_val)
-    
-    for test_csv_path in test_csv_files:
-        df_test = pd.read_csv(test_csv_path, index_col=0)
-        df_test_list.append(df_test)
+        complete_for_02 = []
+        for i in range(6):
+            validdata = pd.read_csv(f"./saved_runs/with_pv0.2/val{i}_data_scaled.csv", index_col=0)
+            complete_for_02.append(validdata)
 
-    target_columns = list(df_train.columns)
-    df_train_scaled = pd.DataFrame(columns = target_columns)
-    df_test_scaled_list = [pd.DataFrame(columns = target_columns) for i in range(len(test_csv_files))]
-    df_valid_scaled_list = [pd.DataFrame(columns = target_columns) for i in range(len(valid_csv_files))]
-    
-    #Min-Max normalization
-    scaling_dictionary = {}
-    for column in target_columns:
-        max_val = df_train.loc[:, column].values.max()
-        min_val = df_train.loc[:, column].values.min()
-        #scaling_dictionary[column] = {'min' : min_val}
-        scaling_dictionary[column] = {'max' : max_val, 'min': min_val}
-        #print(df_train_val[column])
-        if max_val == min_val:
-            df_train_scaled[column] = 0.2
-        else:
-            df_train_scaled[column] = (df_train[column].values - min_val) / (max_val - min_val)
-    df_train_scaled.index = df_train.index
-    
-      
-    
-    for i, (df_valid, df_valid_scaled) in enumerate(zip(df_valid_list, df_valid_scaled_list)):
-            for column in target_columns:
-                max_val = scaling_dictionary[column]['max']
-                min_val = scaling_dictionary[column]['min']
-                if max_val == min_val:
-                    df_valid_scaled[column] = 0.2
-                else:
-                    df_valid_scaled[column] = (df_valid[column].values - min_val) / (max_val - min_val)
-            df_valid_scaled.index = df_valid.index
-            df_valid_scaled_list[i] = df_valid_scaled
+        complete_for_06 = []
+        for i in range(6):
+            validdata = pd.read_csv(f"./saved_runs/with_pv0.6/val{i}_data_scaled.csv", index_col=0)
+            complete_for_06.append(validdata)
 
-    for i, (df_test, df_test_scaled) in enumerate(zip(df_test_list, df_test_scaled_list)):
-            for column in target_columns:
-                max_val = scaling_dictionary[column]['max']
-                min_val = scaling_dictionary[column]['min']
-                if max_val == min_val:
-                    df_test_scaled[column] = 0.2
-                else:
-                    df_test_scaled[column] = (df_test[column].values - min_val) / (max_val - min_val)
-            df_test_scaled.index = df_test.index
-            df_test_scaled_list[i] = df_test_scaled
+        complete_for_10 = []
+        for i in range(6):
+            validdata = pd.read_csv(f"./saved_runs/with_pv1.0/val{i}_data_scaled.csv", index_col=0)
+            complete_for_10.append(validdata)
+
+        df_valid_02 = pd.concat(complete_for_02, axis=0)
+        df_valid_06 = pd.concat(complete_for_06, axis=0)
+        df_valid_10 = pd.concat(complete_for_10, axis=0)
+
+        df_valid_scaled = pd.concat([df_valid_02, df_valid_06, df_valid_10], axis=0)
+        df_valid_scaled = df_valid_scaled.sort_index()
+        df_valid_scaled.to_csv(os.path.join(experiment_path, 'valid_combined_data_scaled.csv'))
+
+        sequences_valid_all = generate_sequences(df_valid_scaled,lookback,1)
+
+        train_ds = SequenceDataset(sequences_train, positional_encoding = positional_encoding)
+        valid_ds = SequenceDataset(sequences_valid_all, positional_encoding = positional_encoding)
+
+        trainloader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+        validloader = DataLoader(valid_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
             
+    else:
 
-    # Write Scaling factors:
-    with open(scaling_factors_path, 'w') as file:
-        json.dump(scaling_dictionary, file)
-    #Write Test data for further evaluation:
-    df_train_scaled.to_csv(os.path.join(experiment_path,'train_data_scaled.csv'))
+        # Start dataset loading
+        df_train = pd.read_csv(os.path.join(data_path, 'train.csv'), index_col=0)
+        df_test_list = []
+        df_valid_list = []
 
-    for i in range(len(df_test_scaled_list)):
-        df_test_scaled_list[i].to_csv(os.path.join(experiment_path, f'test{i}_data_scaled.csv'))
-    
-    for i in range(len(df_valid_scaled_list)):
-        df_valid_scaled_list[i].to_csv(os.path.join(experiment_path, f'val{i}_data_scaled.csv'))
+        valid_csv_files = search_csv_files(data_path, 'val')
+        test_csv_files = search_csv_files(data_path, 'test')
 
-    sequences_train = generate_sequences(df_train_scaled, lookback, 1)
-    print(len(sequences_train))
-    
-    sequences_valid_list = []
-    for i, df_valid_scaled in enumerate(df_valid_scaled_list):
-            sequences_valid = generate_sequences(df_valid_scaled, lookback, 1)
-            sequences_valid_list.append(sequences_valid)
+        for valid_csv_path in valid_csv_files:
+            df_val = pd.read_csv(valid_csv_path, index_col=0)
+            df_valid_list.append(df_val)
+        
+        for test_csv_path in test_csv_files:
+            df_test = pd.read_csv(test_csv_path, index_col=0)
+            df_test_list.append(df_test)
 
-    sequences_valid_all = {}
-    k = 0
-    for data in sequences_valid_list:
-        for j in range(len(data)):
-            sequences_valid_all[k] = data[j]
-            k += 1
+        target_columns = list(df_train.columns)
+        df_train_scaled = pd.DataFrame(columns = target_columns)
+        df_test_scaled_list = [pd.DataFrame(columns = target_columns) for i in range(len(test_csv_files))]
+        df_valid_scaled_list = [pd.DataFrame(columns = target_columns) for i in range(len(valid_csv_files))]
+        
+        #Min-Max normalization
+        scaling_dictionary = {}
+        for column in target_columns:
+            max_val = df_train.loc[:, column].values.max()
+            min_val = df_train.loc[:, column].values.min()
+            #scaling_dictionary[column] = {'min' : min_val}
+            scaling_dictionary[column] = {'max' : max_val, 'min': min_val}
+            #print(df_train_val[column])
+            if max_val == min_val:
+                df_train_scaled[column] = 0.2
+            else:
+                df_train_scaled[column] = (df_train[column].values - min_val) / (max_val - min_val)
+        df_train_scaled.index = df_train.index
+        
+        
+        
+        for i, (df_valid, df_valid_scaled) in enumerate(zip(df_valid_list, df_valid_scaled_list)):
+                for column in target_columns:
+                    max_val = scaling_dictionary[column]['max']
+                    min_val = scaling_dictionary[column]['min']
+                    if max_val == min_val:
+                        df_valid_scaled[column] = 0.2
+                    else:
+                        df_valid_scaled[column] = (df_valid[column].values - min_val) / (max_val - min_val)
+                df_valid_scaled.index = df_valid.index
+                df_valid_scaled_list[i] = df_valid_scaled
 
-    train_ds = SequenceDataset(sequences_train, positional_encoding = positional_encoding)
-    valid_ds = SequenceDataset(sequences_valid_all, positional_encoding = positional_encoding)
+        for i, (df_test, df_test_scaled) in enumerate(zip(df_test_list, df_test_scaled_list)):
+                for column in target_columns:
+                    max_val = scaling_dictionary[column]['max']
+                    min_val = scaling_dictionary[column]['min']
+                    if max_val == min_val:
+                        df_test_scaled[column] = 0.2
+                    else:
+                        df_test_scaled[column] = (df_test[column].values - min_val) / (max_val - min_val)
+                df_test_scaled.index = df_test.index
+                df_test_scaled_list[i] = df_test_scaled
+                
 
-    trainloader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
-    validloader = DataLoader(valid_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+        # Write Scaling factors:
+        with open(scaling_factors_path, 'w') as file:
+            json.dump(scaling_dictionary, file)
+        #Write Test data for further evaluation:
+        df_train_scaled.to_csv(os.path.join(experiment_path,'train_data_scaled.csv'))
+
+        for i in range(len(df_test_scaled_list)):
+            df_test_scaled_list[i].to_csv(os.path.join(experiment_path, f'test{i}_data_scaled.csv'))
+        
+        for i in range(len(df_valid_scaled_list)):
+            df_valid_scaled_list[i].to_csv(os.path.join(experiment_path, f'val{i}_data_scaled.csv'))
+
+        sequences_train = generate_sequences(df_train_scaled, lookback, 1)
+        print(len(sequences_train))
+        
+        sequences_valid_list = []
+        for i, df_valid_scaled in enumerate(df_valid_scaled_list):
+                sequences_valid = generate_sequences(df_valid_scaled, lookback, 1)
+                sequences_valid_list.append(sequences_valid)
+
+        sequences_valid_all = {}
+        k = 0
+        for data in sequences_valid_list:
+            for j in range(len(data)):
+                sequences_valid_all[k] = data[j]
+                k += 1
+
+        train_ds = SequenceDataset(sequences_train, positional_encoding = positional_encoding)
+        valid_ds = SequenceDataset(sequences_valid_all, positional_encoding = positional_encoding)
+
+        trainloader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+        validloader = DataLoader(valid_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
 
     print("Start training")
     for epoch in range(EPOCH):  
@@ -188,8 +236,9 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--lookback', type=int, default=100, help='look back of network') #smaller lookback window for smaller data (default 100)
     parser.add_argument('--positional_encoding', type = str, default='pv_const', choices=['none', 'sun', 'all','pv_const'], help='defines which data to use for forecasting')
-    parser.add_argument('--data_path', type=str, default='./raw_data/pv0.2')
-    parser.add_argument('--experiment_path', type=str, default='./saved_runs/with_pv0.2')
+    parser.add_argument('--data_path', type=str, default='./raw_data/combined_pv_sizes')
+    parser.add_argument('--experiment_path', type=str, default='./saved_runs/with_combined_pv_sizes')
+    parser.add_argument('--combined', type=int, default=1)
     args = parser.parse_args()
 
     print("device is --------------", args.device)
