@@ -57,6 +57,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1, eta_min=0)
 
+    # This case uses the already nomralized train and valid values (wrong because they have different scalings)
     if combined == -1:
         #list_of_combined_sizes = ["0.2", "0.6", "1.0"]
 
@@ -101,6 +102,7 @@ def main():
         trainloader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
         validloader = DataLoader(valid_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
 
+    #This case combines 3 datasets by concaninating them and sorting so each timestamp exists 3 times
     elif combined == 1:
 
         df_02 = pd.read_csv("./raw_data/pv0.2/train.csv", index_col=0)
@@ -182,8 +184,6 @@ def main():
                 df_train_scaled[column] = (df_train[column].values - min_val) / (max_val - min_val)
         df_train_scaled.index = df_train.index
         
-        
-        
         for i, (df_valid, df_valid_scaled) in enumerate(zip(df_valid_list, df_valid_scaled_list)):
                 for column in target_columns:
                     max_val = scaling_dictionary[column]['max']
@@ -240,6 +240,7 @@ def main():
         trainloader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
         validloader = DataLoader(valid_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
 
+    # Default case
     else:
 
         # Start dataset loading
@@ -376,9 +377,9 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--lookback', type=int, default=100, help='look back of network') #smaller lookback window for smaller data (default 100)
     parser.add_argument('--positional_encoding', type = str, default='pv_const', choices=['none', 'sun', 'all','pv_const'], help='defines which data to use for forecasting')
-    parser.add_argument('--data_path', type=str, default='./raw_data/combined_pv_sizes')
-    parser.add_argument('--experiment_path', type=str, default='./saved_runs/with_combined_pv_sizes')
-    parser.add_argument('--combined', type=int, default=1)
+    parser.add_argument('--data_path', type=str, default='./raw_data/pv0.2')
+    parser.add_argument('--experiment_path', type=str, default='./saved_runs/with_pv0.2')
+    parser.add_argument('--combined', type=int, default=0) # flag to choose which trainings case
     args = parser.parse_args()
 
     print("device is --------------", args.device)
