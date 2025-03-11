@@ -27,7 +27,7 @@ def main():
     scaling_factors_path = os.path.join(experiment_path, 'scalings.json')
     os.makedirs(experiment_path, exist_ok=True)
 
-    # Flag for combined datasets
+    # Flag for combined pv datasets
     combined = args.combined
   
     # Dataframe for storing important metrics over epochs
@@ -56,8 +56,9 @@ def main():
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1, eta_min=0)
-    if combined == 1:
-        list_of_combined_sizes = ["0.2", "0.6", "1.0"]
+
+    if combined == -1:
+        #list_of_combined_sizes = ["0.2", "0.6", "1.0"]
 
         df_02 = pd.read_csv("./saved_runs/with_pv0.2/train_data_scaled.csv", index_col=0)
         df_06 = pd.read_csv("./saved_runs/with_pv0.6/train_data_scaled.csv", index_col=0)
@@ -96,10 +97,149 @@ def main():
 
         train_ds = SequenceDataset(sequences_train, positional_encoding = positional_encoding)
         valid_ds = SequenceDataset(sequences_valid_all, positional_encoding = positional_encoding)
+        
+        trainloader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+        validloader = DataLoader(valid_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+
+    elif combined == 1:
+
+        df_02 = pd.read_csv("./raw_data/pv0.2/train.csv", index_col=0)
+        df_06 = pd.read_csv("./raw_data/pv0.6/train.csv", index_col=0)
+        df_10 = pd.read_csv("./raw_data/pv1.0/train.csv", index_col=0)
+        df_train = pd.concat([df_02, df_06, df_10], axis=0)
+        df_train = df_train.sort_index()
+
+        df_test_list = []
+        df_valid_list = []
+
+        complete_valid_for_02 = []
+        for i in range(6):
+            validdata = pd.read_csv(f"./raw_data/pv0.2/val{i}.csv", index_col=0)
+            complete_valid_for_02.append(validdata)
+
+        complete_valid_for_06 = []
+        for i in range(6):
+            validdata = pd.read_csv(f"./raw_data/pv0.6/val{i}.csv", index_col=0)
+            complete_valid_for_06.append(validdata)
+
+        complete_valid_for_10 = []
+        for i in range(6):
+            validdata = pd.read_csv(f"./raw_data/pv1.0/val{i}.csv", index_col=0)
+            complete_valid_for_10.append(validdata)
+
+        df_valid_02 = pd.concat(complete_valid_for_02, axis=0)
+        df_valid_06 = pd.concat(complete_valid_for_06, axis=0)
+        df_valid_10 = pd.concat(complete_valid_for_10, axis=0)
+
+        df_valid_combined = pd.concat([df_valid_02, df_valid_06, df_valid_10], axis=0)
+        df_valid_combined = df_valid_combined.sort_index()
+        df_valid_combined.to_csv(os.path.join(data_path, 'valid_combined_data.csv'))
+
+        df_valid_list.append(df_valid_combined)
+
+        complete_test_for_02 = []
+        for i in range(6):
+            testdata = pd.read_csv(f"./raw_data/pv0.2/test{i}.csv", index_col=0)
+            complete_test_for_02.append(testdata)
+
+        complete_test_for_06 = []
+        for i in range(6):
+            testdata = pd.read_csv(f"./raw_data/pv0.6/test{i}.csv", index_col=0)
+            complete_test_for_06.append(testdata)
+
+        complete_test_for_10 = []
+        for i in range(6):
+            testdata = pd.read_csv(f"./raw_data/pv1.0/test{i}.csv", index_col=0)
+            complete_test_for_10.append(testdata)
+
+        df_test_02 = pd.concat(complete_test_for_02, axis=0)
+        df_test_06 = pd.concat(complete_test_for_06, axis=0)
+        df_test_10 = pd.concat(complete_test_for_10, axis=0)
+
+        df_test_combined = pd.concat([df_test_02, df_test_06, df_test_10], axis=0)
+        df_test_combined = df_test_combined.sort_index()
+        df_test_combined.to_csv(os.path.join(data_path, 'test_combined_data.csv'))
+
+        df_test_list.append(df_test_combined)
+
+
+        target_columns = list(df_train.columns)
+        df_train_scaled = pd.DataFrame(columns = target_columns)
+        df_test_scaled_list = [pd.DataFrame(columns = target_columns) ]
+        df_valid_scaled_list = [pd.DataFrame(columns = target_columns) ]
+
+        #Min-Max normalization
+        scaling_dictionary = {}
+        for column in target_columns:
+            max_val = df_train.loc[:, column].values.max()
+            min_val = df_train.loc[:, column].values.min()
+            #scaling_dictionary[column] = {'min' : min_val}
+            scaling_dictionary[column] = {'max' : max_val, 'min': min_val}
+            #print(df_train_val[column])
+            if max_val == min_val:
+                df_train_scaled[column] = 0.2
+            else:
+                df_train_scaled[column] = (df_train[column].values - min_val) / (max_val - min_val)
+        df_train_scaled.index = df_train.index
+        
+        
+        
+        for i, (df_valid, df_valid_scaled) in enumerate(zip(df_valid_list, df_valid_scaled_list)):
+                for column in target_columns:
+                    max_val = scaling_dictionary[column]['max']
+                    min_val = scaling_dictionary[column]['min']
+                    if max_val == min_val:
+                        df_valid_scaled[column] = 0.2
+                    else:
+                        df_valid_scaled[column] = (df_valid[column].values - min_val) / (max_val - min_val)
+                df_valid_scaled.index = df_valid.index
+                df_valid_scaled_list[i] = df_valid_scaled
+
+        for i, (df_test, df_test_scaled) in enumerate(zip(df_test_list, df_test_scaled_list)):
+                for column in target_columns:
+                    max_val = scaling_dictionary[column]['max']
+                    min_val = scaling_dictionary[column]['min']
+                    if max_val == min_val:
+                        df_test_scaled[column] = 0.2
+                    else:
+                        df_test_scaled[column] = (df_test[column].values - min_val) / (max_val - min_val)
+                df_test_scaled.index = df_test.index
+                df_test_scaled_list[i] = df_test_scaled
+                
+
+        # Write Scaling factors:
+        with open(scaling_factors_path, 'w') as file:
+            json.dump(scaling_dictionary, file)
+        #Write Test data for further evaluation:
+        df_train_scaled.to_csv(os.path.join(experiment_path,'train_data_scaled.csv'))
+
+        for i in range(len(df_test_scaled_list)):
+            df_test_scaled_list[i].to_csv(os.path.join(experiment_path, f'test{i}_data_scaled.csv'))
+        
+        for i in range(len(df_valid_scaled_list)):
+            df_valid_scaled_list[i].to_csv(os.path.join(experiment_path, f'val{i}_data_scaled.csv'))
+
+        sequences_train = generate_sequences(df_train_scaled, lookback, 1)
+        print(len(sequences_train))
+        
+        sequences_valid_list = []
+        for i, df_valid_scaled in enumerate(df_valid_scaled_list):
+                sequences_valid = generate_sequences(df_valid_scaled, lookback, 1)
+                sequences_valid_list.append(sequences_valid)
+
+        sequences_valid_all = {}
+        k = 0
+        for data in sequences_valid_list:
+            for j in range(len(data)):
+                sequences_valid_all[k] = data[j]
+                k += 1
+
+        train_ds = SequenceDataset(sequences_train, positional_encoding = positional_encoding)
+        valid_ds = SequenceDataset(sequences_valid_all, positional_encoding = positional_encoding)
 
         trainloader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
         validloader = DataLoader(valid_ds, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
-            
+
     else:
 
         # Start dataset loading
