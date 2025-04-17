@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from time import time as get_time
-from utils import train_one_epoch, evaluate, generate_sequences
+from utils import train_one_epoch, evaluate, generate_sequences, generate_sequences_combined
 from utils import SequenceDataset, search_csv_files
 from models import simpleLSTM
 
@@ -57,114 +57,135 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=1, eta_min=0)
 
-    #This case combines 3 datasets by concaninating them so each timestamp exists 3 times for different pv sizes
+    
+    #This case combines 3 datasets by concaninating them and sorting so each timestamp exists 3 times
     if combined == 1:
-
+        
         df_02 = pd.read_csv("./raw_data/pv0.2/train.csv", index_col=0)
         df_06 = pd.read_csv("./raw_data/pv0.6/train.csv", index_col=0)
         df_10 = pd.read_csv("./raw_data/pv1.0/train.csv", index_col=0)
         df_train = pd.concat([df_02, df_06, df_10], axis=0)
+        df_train.to_csv(os.path.join(data_path,'train_data_combined.csv'))
         
-
         df_test_list = []
         df_valid_list = []
 
-        complete_valid_for_02 = []
         for i in range(6):
-            validdata = pd.read_csv(f"./raw_data/pv0.2/val{i}.csv", index_col=0)
-            complete_valid_for_02.append(validdata)
+            
+            validdata_02 = pd.read_csv(f"./raw_data/pv0.2/val{i}.csv", index_col=0)
+            validdata_06 = pd.read_csv(f"./raw_data/pv0.6/val{i}.csv", index_col=0)
+            validdata_10 = pd.read_csv(f"./raw_data/pv1.0/val{i}.csv", index_col=0)
+            df_combined_val_one_month = pd.concat([validdata_02,validdata_06,validdata_10],axis=0)
+            df_combined_val_one_month.to_csv(os.path.join(data_path, f'val{i}_data_combined.csv'))
 
-        complete_valid_for_06 = []
-        for i in range(6):
-            validdata = pd.read_csv(f"./raw_data/pv0.6/val{i}.csv", index_col=0)
-            complete_valid_for_06.append(validdata)
-
-        complete_valid_for_10 = []
-        for i in range(6):
-            validdata = pd.read_csv(f"./raw_data/pv1.0/val{i}.csv", index_col=0)
-            complete_valid_for_10.append(validdata)
-
-        df_valid_02 = pd.concat(complete_valid_for_02, axis=0)
-        df_valid_06 = pd.concat(complete_valid_for_06, axis=0)
-        df_valid_10 = pd.concat(complete_valid_for_10, axis=0)
-
-        df_valid_combined = pd.concat([df_valid_02, df_valid_06, df_valid_10], axis=0)
         
-        df_valid_combined.to_csv(os.path.join(data_path, 'valid_combined_data.csv'))
-
-        df_valid_list.append(df_valid_combined)
-
-        complete_test_for_02 = []
         for i in range(6):
-            testdata = pd.read_csv(f"./raw_data/pv0.2/test{i}.csv", index_col=0)
-            complete_test_for_02.append(testdata)
+            
+            testdata_02 = pd.read_csv(f"./raw_data/pv0.2/test{i}.csv", index_col=0)
+            testdata_06 = pd.read_csv(f"./raw_data/pv0.6/test{i}.csv", index_col=0)
+            testdata_10 = pd.read_csv(f"./raw_data/pv1.0/test{i}.csv", index_col=0)
+            df_combined_test_one_month = pd.concat([testdata_02,testdata_06,testdata_10],axis=0)
+            df_combined_test_one_month.to_csv(os.path.join(data_path, f'test{i}_data_combined.csv'))
 
-        complete_test_for_06 = []
-        for i in range(6):
-            testdata = pd.read_csv(f"./raw_data/pv0.6/test{i}.csv", index_col=0)
-            complete_test_for_06.append(testdata)
+        valid_csv_files = search_csv_files(data_path, 'val')
+        test_csv_files = search_csv_files(data_path, 'test')
 
-        complete_test_for_10 = []
-        for i in range(6):
-            testdata = pd.read_csv(f"./raw_data/pv1.0/test{i}.csv", index_col=0)
-            complete_test_for_10.append(testdata)
-
-        df_test_02 = pd.concat(complete_test_for_02, axis=0)
-        df_test_06 = pd.concat(complete_test_for_06, axis=0)
-        df_test_10 = pd.concat(complete_test_for_10, axis=0)
-
-        df_test_combined = pd.concat([df_test_02, df_test_06, df_test_10], axis=0)
+        for valid_csv_path in valid_csv_files:
+            df_val = pd.read_csv(valid_csv_path, index_col=0)
+            df_valid_list.append(df_val)
         
-        df_test_combined.to_csv(os.path.join(data_path, 'test_combined_data.csv'))
+        for test_csv_path in test_csv_files:
+            df_test = pd.read_csv(test_csv_path, index_col=0)
+            df_test_list.append(df_test)
 
-        df_test_list.append(df_test_combined)
-
-
+        df_valid_size = df_valid_list[0]
+        df_test_size = df_test_list[0]
         target_columns = list(df_train.columns)
-        df_train_scaled = pd.DataFrame(columns = target_columns)
-        df_test_scaled_list = [pd.DataFrame(columns = target_columns) ]
-        df_valid_scaled_list = [pd.DataFrame(columns = target_columns) ]
+        df_train_scaled = pd.DataFrame(columns = target_columns, index=df_train.index)
+        df_test_scaled_list = [pd.DataFrame(columns = target_columns, index = df_test_size.index) for i in range(len(test_csv_files)) ]
+        df_valid_scaled_list = [pd.DataFrame(columns = target_columns, index = df_valid_size.index) for i in range(len(valid_csv_files)) ]
 
         #Min-Max normalization
         scaling_dictionary = {}
-        for column in target_columns:
-            max_val = df_train.loc[:, column].values.max()
-            min_val = df_train.loc[:, column].values.min()
-            #scaling_dictionary[column] = {'min' : min_val}
-            scaling_dictionary[column] = {'max' : max_val, 'min': min_val}
-            #print(df_train_val[column])
-            if max_val == min_val:
-                df_train_scaled[column] = 0.2
-            else:
-                df_train_scaled[column] = (df_train[column].values - min_val) / (max_val - min_val)
+        num_blocks=3
+        size_block = 17376
+        for block in range(num_blocks):
+            start_idx = block * size_block
+            end_idx = (block + 1) * size_block if block < num_blocks - 1 else len(df_train)
+            for column in target_columns:
+                max_val = df_train.iloc[start_idx:end_idx] [column].max()
+                min_val = df_train.iloc[start_idx:end_idx] [column].min()
+                #scaling_dictionary[column] = {'min' : min_val}
+                scaling_dictionary[(block, column)] = {'max': max_val, 'min': min_val}
+                #scaling_dictionary[column] = {'max' : max_val, 'min': min_val}
+                #print(df_train_val[column])
+                if max_val == min_val:
+                    if max_val == 0.2:
+                        df_train_scaled.iloc[start_idx:end_idx, df_train_scaled.columns.get_loc(column)] = 0.2
+                    elif max_val == 0.6:
+                        df_train_scaled.iloc[start_idx:end_idx, df_train_scaled.columns.get_loc(column)] = 0.6
+                    elif max_val == 1.0:
+                        df_train_scaled.iloc[start_idx:end_idx, df_train_scaled.columns.get_loc(column)] = 1.0
+                else:
+                    scaled_values = (df_train.iloc[start_idx:end_idx][column] - min_val) / (max_val - min_val)
+                    df_train_scaled.iloc[start_idx:end_idx, df_train_scaled.columns.get_loc(column)] = scaled_values.values
         df_train_scaled.index = df_train.index
-        
+
         for i, (df_valid, df_valid_scaled) in enumerate(zip(df_valid_list, df_valid_scaled_list)):
-                for column in target_columns:
-                    max_val = scaling_dictionary[column]['max']
-                    min_val = scaling_dictionary[column]['min']
-                    if max_val == min_val:
-                        df_valid_scaled[column] = 0.2
-                    else:
-                        df_valid_scaled[column] = (df_valid[column].values - min_val) / (max_val - min_val)
+                num_blocks = 3
+                for block in range(num_blocks):
+                    size_of_blocks = 1344
+                    start_idx = block * size_of_blocks
+                    end_idx = (block + 1) * size_of_blocks if block < num_blocks - 1 else len(df_valid)
+                    for column in target_columns:
+                        max_val = scaling_dictionary[(block,column)]['max']
+                        min_val = scaling_dictionary[(block,column)]['min']
+                        if max_val == min_val:
+                            if max_val == 0.2:
+                                df_valid_scaled.iloc[start_idx:end_idx, df_valid_scaled.columns.get_loc(column)] = 0.2
+                            elif max_val == 0.6:
+                                df_valid_scaled.iloc[start_idx:end_idx, df_valid_scaled.columns.get_loc(column)] = 0.6
+                            elif max_val == 1.0:
+                                df_valid_scaled.iloc[start_idx:end_idx, df_valid_scaled.columns.get_loc(column)] = 1.0
+                        else:
+                            scaled_values = (df_valid.iloc[start_idx:end_idx][column] - min_val) / (max_val - min_val)
+                            df_valid_scaled.iloc[start_idx:end_idx, df_valid_scaled.columns.get_loc(column)] = scaled_values.values
+
                 df_valid_scaled.index = df_valid.index
                 df_valid_scaled_list[i] = df_valid_scaled
 
         for i, (df_test, df_test_scaled) in enumerate(zip(df_test_list, df_test_scaled_list)):
-                for column in target_columns:
-                    max_val = scaling_dictionary[column]['max']
-                    min_val = scaling_dictionary[column]['min']
-                    if max_val == min_val:
-                        df_test_scaled[column] = 0.2
-                    else:
-                        df_test_scaled[column] = (df_test[column].values - min_val) / (max_val - min_val)
+                num_blocks = 3
+                for block in range(num_blocks):
+                    size_of_blocks = 1344
+                    start_idx = block * size_of_blocks
+                    end_idx = (block + 1) * size_of_blocks if block < num_blocks - 1 else len(df_test)
+                    for column in target_columns:
+                        max_val = scaling_dictionary[(block,column)]['max']
+                        min_val = scaling_dictionary[(block,column)]['min']
+                        if max_val == min_val:
+                            if max_val == 0.2:
+                                df_test_scaled.iloc[start_idx:end_idx, df_test_scaled.columns.get_loc(column)] = 0.2
+                            elif max_val == 0.6:
+                                df_test_scaled.iloc[start_idx:end_idx, df_test_scaled.columns.get_loc(column)] = 0.6
+                            elif max_val == 1.0:
+                                df_test_scaled.iloc[start_idx:end_idx, df_test_scaled.columns.get_loc(column)] = 1.0
+                        else:
+                            scaled_values = (df_test.iloc[start_idx:end_idx][column] - min_val) / (max_val - min_val)
+                            df_test_scaled.iloc[start_idx:end_idx, df_test_scaled.columns.get_loc(column)] = scaled_values.values
+
                 df_test_scaled.index = df_test.index
                 df_test_scaled_list[i] = df_test_scaled
-                
+
 
         # Write Scaling factors:
+        scaling_dictionary_json = {
+        f"{block}|{column}": value
+        for (block, column), value in scaling_dictionary.items()}
+
+        # In JSON schreiben
         with open(scaling_factors_path, 'w') as file:
-            json.dump(scaling_dictionary, file)
+            json.dump(scaling_dictionary_json, file)
         #Write Test data for further evaluation:
         df_train_scaled.to_csv(os.path.join(experiment_path,'train_data_scaled.csv'))
 
@@ -174,12 +195,15 @@ def main():
         for i in range(len(df_valid_scaled_list)):
             df_valid_scaled_list[i].to_csv(os.path.join(experiment_path, f'val{i}_data_scaled.csv'))
 
-        sequences_train = generate_sequences(df_train_scaled, lookback, 1)
-        print(len(sequences_train))
+        sequences_train = generate_sequences_combined(df_train_scaled, lookback, 1)
+        #print(sequences_train[0][0])
+        #print(sequences_train[0][1])
+       
+        #print(len(sequences_train))
         
         sequences_valid_list = []
         for i, df_valid_scaled in enumerate(df_valid_scaled_list):
-                sequences_valid = generate_sequences(df_valid_scaled, lookback, 1)
+                sequences_valid = generate_sequences_combined(df_valid_scaled, lookback, 1)
                 sequences_valid_list.append(sequences_valid)
 
         sequences_valid_all = {}
@@ -228,7 +252,7 @@ def main():
             scaling_dictionary[column] = {'max' : max_val, 'min': min_val}
             #print(df_train_val[column])
             if max_val == min_val:
-                df_train_scaled[column] = 0.4
+                df_train_scaled[column] = 0.2
             else:
                 df_train_scaled[column] = (df_train[column].values - min_val) / (max_val - min_val)
         df_train_scaled.index = df_train.index
@@ -240,7 +264,7 @@ def main():
                     max_val = scaling_dictionary[column]['max']
                     min_val = scaling_dictionary[column]['min']
                     if max_val == min_val:
-                        df_valid_scaled[column] = 0.4
+                        df_valid_scaled[column] = 0.2
                     else:
                         df_valid_scaled[column] = (df_valid[column].values - min_val) / (max_val - min_val)
                 df_valid_scaled.index = df_valid.index
@@ -251,7 +275,7 @@ def main():
                     max_val = scaling_dictionary[column]['max']
                     min_val = scaling_dictionary[column]['min']
                     if max_val == min_val:
-                        df_test_scaled[column] = 0.4
+                        df_test_scaled[column] = 0.2
                     else:
                         df_test_scaled[column] = (df_test[column].values - min_val) / (max_val - min_val)
                 df_test_scaled.index = df_test.index
@@ -332,9 +356,9 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--lookback', type=int, default=100, help='look back of network') #smaller lookback window for smaller data (default 100)
     parser.add_argument('--positional_encoding', type = str, default='pv_const', choices=['none', 'sun', 'all','pv_const'], help='defines which data to use for forecasting')
-    parser.add_argument('--data_path', type=str, default='./raw_data/pv0.4')
-    parser.add_argument('--experiment_path', type=str, default='./saved_runs/with_pv0.4')
-    parser.add_argument('--combined', type=int, default=0) # flag to choose which trainings case
+    parser.add_argument('--data_path', type=str, default='./raw_data/combined_pv_sizes')
+    parser.add_argument('--experiment_path', type=str, default='./saved_runs/with_combined_pv_sizes')
+    parser.add_argument('--combined', type=int, default=1) # flag to choose which trainings case
     args = parser.parse_args()
 
     print("device is --------------", args.device)

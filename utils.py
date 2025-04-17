@@ -8,13 +8,6 @@ from torch.utils.data import Dataset
 
 # Function that creates sequences and targets 
 def generate_sequences(df: pd.Series, tw: int, pw: int):
-  '''
-  df: Pandas DataFrame of the univariate time-series
-  tw: Training Window - Integer defining how many steps to look back
-  pw: Prediction Window - Integer defining how many steps forward to predict
-
-  returns: dictionary of sequences and targets for all sequences
-  '''
   data = dict() # Store results into a dictionary
   L = len(df)
   for i in range(L-tw-1):
@@ -24,7 +17,7 @@ def generate_sequences(df: pd.Series, tw: int, pw: int):
     power_not_shifted = df[i:i+tw].values[:,0:1]
     #print(power_not_shifted.shape)
     sequence_shift = df[i+1:i+tw+1].values[:,1:]
-    sequence_shift = np.delete(sequence_shift, -2, axis=1) #deletion of irradiance forecast
+    sequence_shift = np.delete(sequence_shift, -2, axis=1) #deletion of irradiance_fc
     #print(sequence_shift.shape)
     sequence = np.concatenate((power_not_shifted, sequence_shift), axis = 1)
     #print(sequence.shape)
@@ -34,6 +27,38 @@ def generate_sequences(df: pd.Series, tw: int, pw: int):
     data[i] = {'sequence': sequence, 'target': target}
   return data
 
+def generate_sequences_combined(df: pd.DataFrame, tw: int, pw: int, n_splits: int = 3):
+    '''
+    df: Pandas DataFrame of the univariate time-series
+    tw: Training Window - Integer defining how many steps to look back
+    pw: Prediction Window - Integer defining how many steps forward to predict
+    n_splits: Number of different datasets that are combined
+
+    returns: Dict with all sequences
+    '''
+    data = dict()
+    L = len(df)
+    split_size = L // n_splits  # size of splits
+    idx = 0  # global index for dict keys
+
+    for split in range(n_splits):
+        start_idx = split * split_size
+        end_idx = (split + 1) * split_size if split < n_splits - 1 else L  # last part takes the rest 
+        #print(end_idx)
+        df_part = df.iloc[start_idx:end_idx].reset_index(drop=True)  # part dataframe
+        #print(df_part[-1:])
+        local_L = len(df_part)
+        for i in range(local_L - tw - pw + 1):  
+            power_not_shifted = df_part[i:i+tw].values[:, 0:1]
+            sequence_shift = df_part[i+1:i+tw+1].values[:, 1:]
+            sequence_shift = np.delete(sequence_shift, -2, axis=1)  # cutting irradiance_fc
+            sequence = np.concatenate((power_not_shifted, sequence_shift), axis=1).astype(np.float32)
+
+            target = df_part[i+tw:i+tw+pw].values[:, 0].astype(np.float32)
+
+            data[idx] = {'sequence': sequence, 'target': target}
+            idx += 1
+    return data
 
 class SequenceDataset(Dataset):
 
@@ -138,7 +163,7 @@ def run_closed_loop(model, whole_sequence, lookback = 100, future_prediction=4, 
       #print(input.shape)
       input = input.view(-1,1,3)
     elif use_positional_encoding == 'pv_const':
-      input_numpy = np.array([whole_sequence[0:lookback, 0], whole_sequence[1:lookback+1, 1], whole_sequence[1:lookback+1, 2],whole_sequence[1:lookback+1, 3],whole_sequence[1:lookback+1,5]])
+      input_numpy = np.array([whole_sequence[0:lookback, 0], whole_sequence[1:lookback+1, 1], whole_sequence[1:lookback+1, 2],whole_sequence[1:lookback+1, 4],whole_sequence[1:lookback+1,5]])
       #print(whole_sequence[:10]) 
       #print(input_numpy.shape)
       input = torch.Tensor(input_numpy.T)
@@ -172,7 +197,7 @@ def run_closed_loop(model, whole_sequence, lookback = 100, future_prediction=4, 
             elif use_positional_encoding == 'sun':
               input = torch.Tensor([pred[0,0], whole_sequence[lookback + i+1, 1], whole_sequence[lookback + i+1, 2]]).view(1,1,3)
             elif use_positional_encoding == 'pv_const':
-              input = torch.Tensor([pred[0,0], whole_sequence[lookback + i+1, 1], whole_sequence[lookback + i+1, 2],  whole_sequence[lookback + i+1, 3], whole_sequence[lookback + i+1, 5]]).view(1,1,5) 
+              input = torch.Tensor([pred[0,0], whole_sequence[lookback + i+1, 1], whole_sequence[lookback + i+1, 2],  whole_sequence[lookback + i+1, 4], whole_sequence[lookback + i+1, 5]]).view(1,1,5) 
             else:
               input = torch.Tensor([pred[0,0]]).view(1,1,1) 
             pred, hx = model(input, hx)
@@ -196,3 +221,5 @@ def perf_measure(y_actual, y_pred):
     fn = np.sum((y_actual==1) & (y_pred==0))
     
     return(tp, tn, fp, fn)
+
+
